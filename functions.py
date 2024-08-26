@@ -2,12 +2,12 @@ import psycopg2, random
 import os
 
 conn_details = {
-    "host": os.getenv("DATABASE_HOST", "postgres"),
-    "database": os.getenv("DATABASE_NAME", "postgres"),
-    "user": os.getenv("DATABASE_USER", "postgres"),
-    "password": os.getenv("DATABASE_PASSWORD", "Mydatabase1391"),
-    "port": os.getenv("DATABASE_PORT", "5432")
-}
+    "host": "host.docker.internal",
+    "database": "postgres",
+    "user": "postgres",
+    "password": "Mydatabase1391",
+    "port": '5432'
+} 
 
 def fetch_user_bookings_from_database(email):
     try:
@@ -21,6 +21,35 @@ def fetch_user_bookings_from_database(email):
     except psycopg2.Error as e:
         print("Error fetching user bookings:", e)
         return None
+    
+def booking_confirmed(activity, date, time, email, phone):
+    try:
+        conn = psycopg2.connect(**conn_details)
+        cur = conn.cursor()
+
+        while True:
+            random_number = random.randint(000000, 999999)
+
+            # Kontrollera om det slumpmässiga numret redan finns i databasen
+            cur.execute("SELECT * FROM bookinginformation WHERE booking_id = %s", (random_number,))
+            result = cur.fetchone()
+
+            if result:
+                print(f"{random_number} finns i databasen.")
+            else:
+                print(f"{random_number} finns inte i databasen.")
+                break
+
+        # Sätt in bokningsinformationen i databasen med det slumpmässiga boknings-id
+        cur.execute("INSERT INTO bookinginformation (booking_id, activity, date, time, email, phone) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (random_number, activity, date, time, email, phone))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except psycopg2.Error as e:
+        print("Error inserting booking information:", e)
+        return False
     
 def delete_booking_from_database(booking_id): # Funktion som kollar om booking_id finns i databasen och raderar
     try: # Anslutning till databas
@@ -52,32 +81,72 @@ def fetch_activities_from_database():
     except psycopg2.Error as e:
         print("Error fetching activities:", e)
         return None
-    
-def booking_confirmed(activity, date, time, email, phone):
+
+def admin_or_not(email):
     try:
         conn = psycopg2.connect(**conn_details)
         cur = conn.cursor()
+        cur.execute("SELECT admin FROM inloggningsuppgifter WHERE email = %s", (email,))
+        admin_status = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        return admin_status
+    except psycopg2.Error as e:
+        return None
 
-        while True:
-            random_number = random.randint(000000, 999999)
+def login_credentials_check(email, password):
+    try:
+        conn = psycopg2.connect(**conn_details)
+        cur = conn.cursor()
+        cur.execute("SELECT password, email, admin FROM inloggningsuppgifter WHERE email = %s AND password = %s", (email, password,))
+        user_info = cur.fetchall()
+        cur.close()
+        conn.close()
+        if user_info:
+            print(user_info)  # Kontrollera om användaren finns i databasen
+            return True
+        print(user_info)
+        return False
+    except psycopg2.Error as e:
+        print("Error checking login credentials:", e)
+        return False
 
-            # Kontrollera om det slumpmässiga numret redan finns i databasen
-            cur.execute("SELECT * FROM bookinginformation WHERE booking_id = %s", (random_number,))
-            result = cur.fetchone()
-
-            if result:
-                print(f"{random_number} finns i databasen.")
-            else:
-                print(f"{random_number} finns inte i databasen.")
-                break
-
-        # Sätt in bokningsinformationen i databasen med det slumpmässiga boknings-id
-        cur.execute("INSERT INTO bookinginformation (booking_id, activity, date, time, email, phone) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (random_number, activity, date, time, email, phone))
+def admin_change_price(activity, price):
+    try:
+        conn = psycopg2.connect(**conn_details)
+        cur = conn.cursor()
+        cur.execute("UPDATE court SET price = %s WHERE activity = %s", (price, activity))
         conn.commit()
         cur.close()
         conn.close()
         return True
     except psycopg2.Error as e:
-        print("Error inserting booking information:", e)
+        print("Error checking login credentials:", e)
         return False
+
+def admin_delete_activity(activity):
+    try:
+        conn = psycopg2.connect(**conn_details)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM court WHERE activity = %s", (activity,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except psycopg2.Error as e:
+        print("Error checking login credentials:", e)
+        return False         
+
+def admin_add_activity(activity, price):
+    try:
+        conn = psycopg2.connect(**conn_details)
+        cur = conn.cursor()
+        cur.execute("INSERT INTO court (activity, price) VALUES (%s, %s)",
+                    (activity, price,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except psycopg2.Error as e:
+        print("Error checking login credentials:", e)
+        return False               
